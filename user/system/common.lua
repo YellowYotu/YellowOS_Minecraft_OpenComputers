@@ -28,6 +28,17 @@ common.KEY_ENTER = 28
 common.KEY_BACKSPACE = 14
 common.KEY_UP = 200
 common.KEY_DOWN = 208
+common.KEY_LEFT = 203
+common.KEY_RIGHT = 205
+common.hasKeyboard = component.list("keyboard")() ~= nil
+
+function common.isEnter(char, code)
+    return code == common.KEY_ENTER or char == 13
+end
+
+function common.isBack(char, code)
+    return code == common.KEY_BACKSPACE or char == 8
+end
 
 function common.clear()
     gpu.setBackground(0x000000)
@@ -51,15 +62,24 @@ function common.waitInput(timeout)
     return table.unpack(event)
 end
 
+function common.dispatchSystemEvent(event)
+    if YellowOS.handleSignal then
+        return YellowOS.handleSignal(table.unpack(event))
+    end
+
+    return false
+end
+
 function common.waitForKey()
     while true do
-        local signal, _, char, code = computer.pullSignal()
+        local event = {computer.pullSignal()}
+        local signal = event[1]
 
         if signal == "key_down" then
-            return char or 0, code or 0
-        elseif YellowOS.handleSignal then
-            YellowOS.handleSignal(signal, _, char, code)
+            return event[3] or 0, event[4] or 0
         end
+
+        common.dispatchSystemEvent(event)
     end
 end
 
@@ -83,19 +103,18 @@ function common.message(title, text)
     while true do
         local event = {computer.pullSignal()}
         local signal = event[1]
-        local code = event[4]
+        local char = event[3] or 0
+        local code = event[4] or 0
 
         if signal == "touch" then
             return
         end
 
-        if signal == "key_down" and code == common.KEY_BACKSPACE then
+        if signal == "key_down" and common.isBack(char, code) then
             return
         end
 
-        if YellowOS.handleSignal then
-            YellowOS.handleSignal(table.unpack(event))
-        end
+        common.dispatchSystemEvent(event)
     end
 end
 
@@ -129,12 +148,18 @@ function common.menu(title, subtitle, items, selected)
 
         gpu.setBackground(0x000000)
         gpu.setForeground(0x808080)
-        gpu.set(3, height - 1, "Tap item or use UP/DOWN + ENTER")
+
+        if common.hasKeyboard then
+            gpu.set(3, height - 1, "BACKSPACE Back   UP/DOWN Select   ENTER Open")
+        else
+            gpu.set(3, height - 1, "Tap item   [keyboard upgrade not installed]")
+        end
 
         local event = {computer.pullSignal()}
         local signal = event[1]
 
         if signal == "key_down" then
+            local char = event[3] or 0
             local code = event[4] or 0
 
             if code == common.KEY_UP then
@@ -149,20 +174,25 @@ function common.menu(title, subtitle, items, selected)
                 if selected > #items then
                     selected = 1
                 end
-            elseif code == common.KEY_ENTER then
+            elseif common.isEnter(char, code) then
                 return selected
-            elseif code == common.KEY_BACKSPACE then
+            elseif common.isBack(char, code) then
                 return nil
             end
         elseif signal == "touch" then
+            local x = event[3]
             local y = event[4]
             local index = y - firstRow + 1
+
+            if y == height - 1 and x <= 14 then
+                return nil
+            end
 
             if index >= 1 and index <= #items then
                 return index
             end
-        elseif YellowOS.handleSignal then
-            YellowOS.handleSignal(table.unpack(event))
+        else
+            common.dispatchSystemEvent(event)
         end
     end
 end
