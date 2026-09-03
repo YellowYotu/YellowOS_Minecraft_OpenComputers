@@ -1,5 +1,8 @@
-local component = component
-local computer = computer
+local component = rawget(_G, "component")
+
+if not component then
+    component = require("component")
+end
 
 local PORT = 24120
 local MANIFEST_URL = "https://raw.githubusercontent.com/YellowYotu/YellowOS_Minecraft_OpenComputers/main/user/manifest.txt"
