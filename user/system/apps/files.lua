@@ -1,6 +1,7 @@
 local component = component
 local common = YellowOS.common
 local gpu = common.gpu
+local computer = computer
 
 local function listEntries(fs, path)
     local entries = {}
@@ -48,13 +49,23 @@ local function showFile(fs, path)
     end
 
     gpu.setForeground(0x808080)
-    gpu.set(2, common.height - 1, "Tap anywhere or BACKSPACE")
+    gpu.set(2, common.height - 1, "[BACK]   BACKSPACE Back")
 
     while true do
-        local signal, _, _, code = computer.pullSignal()
+        local event = {computer.pullSignal()}
+        local signal = event[1]
 
-        if signal == "touch" or (signal == "key_down" and code == common.KEY_BACKSPACE) then
+        if signal == "touch" then
             return
+        elseif signal == "key_down" then
+            local char = event[3] or 0
+            local code = event[4] or 0
+
+            if common.isBack(char, code) then
+                return
+            end
+        else
+            common.dispatchSystemEvent(event)
         end
     end
 end
