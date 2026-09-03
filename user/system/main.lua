@@ -1,73 +1,105 @@
 local common = YellowOS.common
-local gpu = common.gpu
 local computer = computer
+local network = YellowOS.network
+local updater = YellowOS.updater
+local settings = YellowOS.settings
 
-local selected = 1
+local function installPendingUpdate()
+    common.header("Update received")
+    common.gpu.setForeground(0xFFFFFF)
+    common.gpu.set(3, 6, "Checking GitHub release...")
+
+    local manifest, reason = updater.check()
+
+    if not manifest then
+        common.message("Update", "Cannot check update:\n" .. tostring(reason))
+        return
+    end
+
+    if not manifest.updateAvailable then
+        network.pendingUpdate = nil
+        return
+    end
+
+    local free = YellowOS.fs.spaceTotal() - YellowOS.fs.spaceUsed()
+    common.header("YellowOS Update")
+    common.gpu.setForeground(0xFFFFFF)
+    common.gpu.set(3, 5, "Version: " .. manifest.version)
+    common.gpu.set(3, 7, "Update size: " .. common.formatBytes(manifest.size))
+    common.gpu.set(3, 8, "Free storage: " .. common.formatBytes(free))
+
+    if manifest.size > 0 and free < manifest.size then
+        common.gpu.setForeground(0xFF5555)
+        common.gpu.set(3, 10, "Not enough storage.")
+        computer.pullSignal(3)
+        return
+    end
+
+    common.gpu.setForeground(0x00FF00)
+    common.gpu.set(3, 10, "Installing automatically...")
+    computer.pullSignal(0.6)
+
+    local ok, installReason = updater.install(manifest)
+
+    if not ok then
+        common.message("Update failed", tostring(installReason))
+        return
+    end
+
+    common.header("Update complete")
+    common.gpu.setForeground(0x00FF00)
+    common.gpu.set(3, 6, "YellowOS updated to " .. manifest.version)
+    common.gpu.setForeground(0xFFFFFF)
+    common.gpu.set(3, 8, "Rebooting...")
+    computer.pullSignal(1)
+    computer.shutdown(true)
+end
+
+YellowOS.handleSignal = function(...)
+    if network.processSignal(...) then
+        if settings.autoUpdates then
+            installPendingUpdate()
+        end
+    end
+end
+
+network.broadcastPresence()
+
 local items = {
-    "Files",
-    "Account",
-    "Updates",
-    "Settings",
-    "About",
-    "Reboot",
-    "Shutdown"
+    {name = "Files", path = "/system/apps/files.lua"},
+    {name = "Browser", path = "/system/apps/browser.lua"},
+    {name = "Account", path = "/system/apps/account.lua"},
+    {name = "Updates", path = "/system/apps/updates.lua"},
+    {name = "Settings", path = "/system/apps/settings.lua"},
+    {name = "About", path = "/system/apps/about.lua"},
+    {name = "Reboot"},
+    {name = "Shutdown"}
 }
 
 while true do
-    common.header(YellowOS.edition .. " " .. YellowOS.version)
-    gpu.setForeground(0x808080)
-    gpu.set(3, 4, YellowOS.device)
+    local names = {}
 
-    for i, item in ipairs(items) do
-        if i == selected then
-            gpu.setBackground(0xFFFFFF)
-            gpu.setForeground(0x000000)
-        else
-            gpu.setBackground(0x000000)
-            gpu.setForeground(0xFFFFFF)
-        end
-
-        gpu.fill(3, i + 5, common.width - 5, 1, " ")
-        gpu.set(5, i + 5, item)
+    for _, item in ipairs(items) do
+        table.insert(names, item.name)
     end
 
-    gpu.setBackground(0x000000)
-    gpu.setForeground(0x808080)
-    gpu.set(3, common.height - 1, "UP/DOWN Select    ENTER Open")
+    local subtitle = YellowOS.device
 
-    local _, code = common.waitForKey()
+    if network.pendingUpdate and not settings.autoUpdates then
+        subtitle = subtitle .. " | Update " .. network.pendingUpdate.version .. " available"
+    end
 
-    if code == common.KEY_UP then
-        selected = selected - 1
+    local selected = common.menu(YellowOS.edition .. " " .. YellowOS.version, subtitle, names)
 
-        if selected < 1 then
-            selected = #items
-        end
-    elseif code == common.KEY_DOWN then
-        selected = selected + 1
+    if selected then
+        local item = items[selected]
 
-        if selected > #items then
-            selected = 1
-        end
-    elseif code == common.KEY_ENTER then
-        if selected == 6 then
+        if item.path then
+            YellowOS.loadFile(item.path)
+        elseif item.name == "Reboot" then
             computer.shutdown(true)
-        elseif selected == 7 then
+        elseif item.name == "Shutdown" then
             computer.shutdown(false)
-        else
-            common.header(items[selected])
-            gpu.setForeground(0xFFFFFF)
-            gpu.set(3, 6, items[selected] .. " is coming soon.")
-            gpu.setForeground(0x808080)
-            gpu.set(3, common.height - 1, "BACKSPACE Back")
-
-            while true do
-                local _, backCode = common.waitForKey()
-
-                if backCode == common.KEY_BACKSPACE then
-                    break
-                end
-            end
         end
     end
 end
