@@ -1,5 +1,5 @@
 local targetPrefix = ...
-local component = component
+local component = require("component")
 
 if not targetPrefix or targetPrefix == "" then
     error("Usage: lua flash_user.lua <target HDD address prefix>")
