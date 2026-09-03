@@ -1,6 +1,7 @@
 local fs = YellowOS.fs
 local http = YellowOS.http
 local common = YellowOS.common
+local computer = computer
 local updater = {}
 
 local BASE_URL = "https://raw.githubusercontent.com/YellowYotu/YellowOS_Minecraft_OpenComputers/main/user/"
@@ -67,7 +68,8 @@ local function ensureDirectory(path)
 end
 
 function updater.check()
-    local data, reason = http.get(MANIFEST_URL)
+    local cacheKey = tostring(math.floor(computer.uptime() * 1000))
+    local data, reason = http.get(MANIFEST_URL .. "?t=" .. cacheKey)
 
     if not data then
         return nil, reason
@@ -89,9 +91,12 @@ function updater.install(manifest)
         common.header("Updating YellowOS")
         common.gpu.setForeground(0xFFFFFF)
         common.gpu.set(3, 6, "Downloading " .. i .. "/" .. #manifest.files)
-        common.gpu.set(3, 8, path:sub(1, common.width - 4))
+        common.gpu.set(3, 7, common.formatBytes(manifest.size) .. " total")
+        common.gpu.set(3, 9, path:sub(1, common.width - 4))
+        common.gpu.setForeground(0x808080)
+        common.gpu.set(3, common.height - 1, "Updating - controls are temporarily locked")
 
-        local data, reason = http.get(BASE_URL .. path)
+        local data, reason = http.get(BASE_URL .. path .. "?version=" .. manifest.version)
 
         if not data then
             return false, "Download failed: " .. tostring(reason)
