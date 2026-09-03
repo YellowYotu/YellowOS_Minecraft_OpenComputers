@@ -9,11 +9,11 @@ end
 
 local fs = component.proxy(bootAddress)
 
-local function loadFile(path)
-    local handle, reason = fs.open(path, "r")
+local function readAll(path)
+    local handle = fs.open(path, "r")
 
     if not handle then
-        error("Cannot open " .. path .. ": " .. tostring(reason))
+        return nil
     end
 
     local data = ""
@@ -29,6 +29,15 @@ local function loadFile(path)
     end
 
     fs.close(handle)
+    return data
+end
+
+local function loadFile(path)
+    local data = readAll(path)
+
+    if not data then
+        error("Cannot open " .. path)
+    end
 
     local program, loadReason = load(data, "=" .. path, "t", _ENV)
 
@@ -39,12 +48,23 @@ local function loadFile(path)
     return program()
 end
 
+local device = "YellowPad Lite"
+local profile = readAll("/system/device.cfg")
+
+if profile then
+    local configuredDevice = profile:match("device=([^\r\n]+)")
+
+    if configuredDevice and configuredDevice ~= "" then
+        device = configuredDevice
+    end
+end
+
 _G.YellowOS = {
     fs = fs,
     loadFile = loadFile,
-    version = "0.2.1",
+    version = "0.2.2",
     edition = "User Edition",
-    device = "YellowPad Lite"
+    device = device
 }
 
 loadFile("/system/boot.lua")
