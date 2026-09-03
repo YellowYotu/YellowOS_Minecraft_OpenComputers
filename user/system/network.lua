@@ -13,16 +13,23 @@ if modemAddress then
     network.modem.open(network.port)
 end
 
-function network.processSignal(signal, receiver, sender, port, distance, kind, version, size)
+function network.processSignal(signal, receiver, sender, port, distance, kind, version, size, targetDevice)
     if signal ~= "modem_message" or port ~= network.port then
         return false
     end
 
     if kind == "YELLOWOS_UPDATE" then
+        targetDevice = tostring(targetDevice or "ALL")
+
+        if targetDevice ~= "ALL" and targetDevice ~= YellowOS.device then
+            return false
+        end
+
         network.pendingUpdate = {
             version = tostring(version or "unknown"),
             size = tonumber(size) or 0,
-            sender = sender
+            sender = sender,
+            targetDevice = targetDevice
         }
         return true
     end
