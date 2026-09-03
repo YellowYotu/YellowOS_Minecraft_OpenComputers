@@ -7,6 +7,7 @@ end
 
 local items = {
     {name = "Files", path = "/system/apps/files.lua"},
+    {name = "Terminal", path = "/system/apps/terminal.lua"},
     {name = "Update All Clients", path = "/system/apps/update_clients.lua"},
     {name = "Flash User HDD", path = "/system/apps/flash_user.lua"},
     {name = "Update Server", path = "/system/apps/update_server.lua"},
