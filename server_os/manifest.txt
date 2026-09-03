@@ -1,0 +1,14 @@
+version=0.2.0
+size=42000
+init.lua
+system/boot.lua
+system/common.lua
+system/http.lua
+system/updater.lua
+system/main.lua
+system/apps/files.lua
+system/apps/settings.lua
+system/apps/info.lua
+system/apps/update_clients.lua
+system/apps/flash_user.lua
+system/apps/update_server.lua
