@@ -1,6 +1,7 @@
 local common = YellowOS.common
 local http = YellowOS.http
 local gpu = common.gpu
+local computer = computer
 
 local function htmlToText(html)
     html = html:gsub("<script.-</script>", "")
@@ -68,21 +69,34 @@ local function readUrl(url)
         end
 
         gpu.setForeground(0x808080)
-        gpu.set(2, common.height - 1, "Tap left/right for pages, BACKSPACE back")
-        local signal, _, x, _, code = computer.pullSignal()
+        gpu.set(2, common.height - 1, "[BACK]   LEFT/RIGHT or UP/DOWN pages")
+        local event = {computer.pullSignal()}
+        local signal = event[1]
 
-        if signal == "key_down" and code == common.KEY_BACKSPACE then
-            return
-        elseif signal == "key_down" and code == common.KEY_UP then
-            page = math.max(1, page - 1)
-        elseif signal == "key_down" and code == common.KEY_DOWN then
-            page = math.min(pageCount, page + 1)
+        if signal == "key_down" then
+            local char = event[3] or 0
+            local code = event[4] or 0
+
+            if common.isBack(char, code) then
+                return
+            elseif code == common.KEY_LEFT or code == common.KEY_UP then
+                page = math.max(1, page - 1)
+            elseif code == common.KEY_RIGHT or code == common.KEY_DOWN then
+                page = math.min(pageCount, page + 1)
+            end
         elseif signal == "touch" then
-            if x < common.width / 2 then
+            local x = event[3]
+            local y = event[4]
+
+            if y == common.height - 1 and x <= 8 then
+                return
+            elseif x < common.width / 2 then
                 page = math.max(1, page - 1)
             else
                 page = math.min(pageCount, page + 1)
             end
+        else
+            common.dispatchSystemEvent(event)
         end
     end
 end
