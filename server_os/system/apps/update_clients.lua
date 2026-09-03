@@ -18,12 +18,12 @@ local internetAddress = component.list("internet")()
 local modemAddress = component.list("modem")()
 
 if not internetAddress then
-    common.message("Update All Clients", "Internet Card not found")
+    common.message("Update Clients", "Internet Card not found")
     return
 end
 
 if not modemAddress then
-    common.message("Update All Clients", "Wireless Network Card not found")
+    common.message("Update Clients", "Wireless Network Card not found")
     return
 end
 
@@ -56,25 +56,33 @@ local function download(url)
     return data
 end
 
-common.header("Update All Clients")
+common.header("Update Clients")
 gpu.setForeground(0xFFFFFF)
 gpu.set(3, 6, "Checking latest User Edition...")
 local cacheKey = tostring(math.floor(computer.uptime() * 1000))
 local manifest, reason = download(MANIFEST_URL .. "?t=" .. cacheKey)
 
 if not manifest then
-    common.message("Update All Clients", "Failed to check release:\n" .. tostring(reason))
+    common.message("Update Clients", "Failed to check release:\n" .. tostring(reason))
     return
 end
 
 local version = manifest:match("version=([^\r\n]+)") or "unknown"
 local size = tonumber(manifest:match("size=(%d+)")) or 0
-local choice = common.menu("Update All Clients", "Version " .. version .. " | " .. common.formatBytes(size), {"Send update to all clients", "Cancel"})
+local targetChoice = common.menu("Update Clients", "Version " .. version .. " | " .. common.formatBytes(size), {"YellowPad", "YellowPad Lite", "YellowPad Pro", "All YellowPads", "Cancel"})
 
-if choice ~= 1 then
+if not targetChoice or targetChoice == 5 then
+    return
+end
+
+local targets = {"YellowPad", "YellowPad Lite", "YellowPad Pro", "ALL"}
+local targetDevice = targets[targetChoice]
+local confirm = common.menu("Confirm Update", "Target: " .. targetDevice, {"Send update", "Cancel"})
+
+if confirm ~= 1 then
     return
 end
 
 modem.open(PORT)
-modem.broadcast(PORT, "YELLOWOS_UPDATE", version, size)
-common.message("Update All Clients", "Update notification sent.\nVersion: " .. version .. "\nSize: " .. common.formatBytes(size))
+modem.broadcast(PORT, "YELLOWOS_UPDATE", version, size, targetDevice)
+common.message("Update Clients", "Update notification sent.\nTarget: " .. targetDevice .. "\nVersion: " .. version .. "\nSize: " .. common.formatBytes(size))
