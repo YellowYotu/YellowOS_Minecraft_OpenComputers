@@ -1,0 +1,2 @@
+version=0.1.0-test
+file=/yellowos_update_test.txt|releases/user/payload/yellowos_update_test.txt
