@@ -57,6 +57,8 @@ function common.waitForKey()
 
         if signal == "key_down" then
             return char or 0, code or 0
+        elseif YellowOS.handleSignal then
+            YellowOS.handleSignal(signal, _, char, code)
         end
     end
 end
@@ -79,7 +81,9 @@ function common.message(title, text)
     gpu.set(3, height - 1, "Tap anywhere or BACKSPACE")
 
     while true do
-        local signal, _, _, code = computer.pullSignal()
+        local event = {computer.pullSignal()}
+        local signal = event[1]
+        local code = event[4]
 
         if signal == "touch" then
             return
@@ -87,6 +91,10 @@ function common.message(title, text)
 
         if signal == "key_down" and code == common.KEY_BACKSPACE then
             return
+        end
+
+        if YellowOS.handleSignal then
+            YellowOS.handleSignal(table.unpack(event))
         end
     end
 end
@@ -123,10 +131,11 @@ function common.menu(title, subtitle, items, selected)
         gpu.setForeground(0x808080)
         gpu.set(3, height - 1, "Tap item or use UP/DOWN + ENTER")
 
-        local signal, _, a, b = computer.pullSignal()
+        local event = {computer.pullSignal()}
+        local signal = event[1]
 
         if signal == "key_down" then
-            local code = b or 0
+            local code = event[4] or 0
 
             if code == common.KEY_UP then
                 selected = selected - 1
@@ -146,12 +155,14 @@ function common.menu(title, subtitle, items, selected)
                 return nil
             end
         elseif signal == "touch" then
-            local y = b
+            local y = event[4]
             local index = y - firstRow + 1
 
             if index >= 1 and index <= #items then
                 return index
             end
+        elseif YellowOS.handleSignal then
+            YellowOS.handleSignal(table.unpack(event))
         end
     end
 end
