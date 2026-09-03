@@ -38,7 +38,15 @@ if not selected then
 end
 
 local target = drives[selected]
-local confirm = common.menu("WARNING", "ALL DATA ON " .. target.address:sub(1, 8) .. " WILL BE REPLACED", {"Flash YellowOS User Edition", "Cancel"})
+local modelChoice = common.menu("Device Model", "Select YellowPad model", {"YellowPad Lite", "YellowPad", "YellowPad Pro", "Cancel"})
+
+if not modelChoice or modelChoice == 4 then
+    return
+end
+
+local models = {"YellowPad Lite", "YellowPad", "YellowPad Pro"}
+local model = models[modelChoice]
+local confirm = common.menu("WARNING", "ALL DATA ON " .. target.address:sub(1, 8) .. " WILL BE REPLACED", {"Flash " .. model, "Cancel"})
 
 if confirm ~= 1 then
     return
@@ -81,7 +89,7 @@ end
 
 for line in manifest:gmatch("[^\r\n]+") do
     if not line:match("^[%w_]+=") and line ~= "" and line:sub(1, 1) ~= "#" then
-        common.header("Flashing User HDD")
+        common.header("Flashing " .. model)
         common.gpu.set(3, 6, "Installing " .. line)
         local data, downloadReason = http.get(BASE_URL .. line .. "?t=" .. cacheKey)
 
@@ -104,5 +112,14 @@ for line in manifest:gmatch("[^\r\n]+") do
     end
 end
 
-target.fs.setLabel("YellowOS_User")
-common.message("Flash User HDD", "Flash complete.\nUser Edition " .. version)
+local profileHandle, profileReason = target.fs.open("/system/device.cfg", "w")
+
+if not profileHandle then
+    common.message("Flash failed", "Cannot write device profile:\n" .. tostring(profileReason))
+    return
+end
+
+target.fs.write(profileHandle, "device=" .. model .. "\n")
+target.fs.close(profileHandle)
+target.fs.setLabel(model:gsub(" ", "_"))
+common.message("Flash User HDD", "Flash complete.\n" .. model .. "\nUser Edition " .. version)
