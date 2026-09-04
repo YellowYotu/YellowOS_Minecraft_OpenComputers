@@ -1,5 +1,5 @@
-version=0.2.6
-size=54000
+version=0.2.7
+size=55000
 init.lua
 system/boot.lua
 system/common.lua
