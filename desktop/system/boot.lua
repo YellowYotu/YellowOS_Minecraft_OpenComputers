@@ -2,7 +2,11 @@ YellowOS.loadFile("/system/common.lua")
 
 local common = YellowOS.common
 local gpu = common.gpu
-local computer = require("computer")
+local computer = rawget(_G, "computer")
+
+if not computer then
+    error("OpenComputers boot environment is missing computer global")
+end
 
 common.clear()
 gpu.setForeground(0xFFD23F)
