@@ -6,18 +6,13 @@ if not component or not computer then
 end
 
 local bootAddress = computer.getBootAddress()
-if not bootAddress then
-    error("Boot drive not found")
-end
+if not bootAddress then error("Boot drive not found") end
 
 local fs = component.proxy(bootAddress)
 
 local function readAll(path)
     local handle, reason = fs.open(path, "r")
-    if not handle then
-        error("Cannot open " .. path .. ": " .. tostring(reason))
-    end
-
+    if not handle then return nil, reason end
     local data = ""
     while true do
         local chunk = fs.read(handle, 2048)
@@ -29,18 +24,19 @@ local function readAll(path)
 end
 
 local function loadFile(path)
-    local data = readAll(path)
-    local program, reason = load(data, "=" .. path, "t", _ENV)
-    if not program then
-        error(reason)
-    end
+    local data, reason = readAll(path)
+    if not data then error("Cannot open " .. path .. ": " .. tostring(reason)) end
+    local program, loadReason = load(data, "=" .. path, "t", _ENV)
+    if not program then error(loadReason) end
     return program()
 end
 
 _G.YellowOS = {
     fs = fs,
+    bootAddress = bootAddress,
     loadFile = loadFile,
-    version = "0.1.0",
+    readAll = readAll,
+    version = "0.2.0",
     edition = "Desktop Edition"
 }
 
