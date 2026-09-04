@@ -1,0 +1,34 @@
+UI AND INPUT
+
+GPU:
+  local gpu = component.proxy(component.list("gpu")())
+  local width, height = gpu.getResolution()
+
+Basic drawing:
+  gpu.setBackground(0x202020)
+  gpu.setForeground(0xFFFFFF)
+  gpu.fill(x, y, width, height, " ")
+  gpu.set(x, y, "Text")
+
+Signals:
+  local e = {computer.pullSignal()}
+
+Touch:
+  if e[1] == "touch" then
+    local x, y = e[3], e[4]
+  end
+
+Keyboard:
+  if e[1] == "key_down" then
+    local char, code = e[3], e[4]
+  end
+
+Common key codes used by YellowOS:
+  ENTER     28
+  BACKSPACE 14
+  UP        200
+  DOWN      208
+  LEFT      203
+  RIGHT     205
+
+Mobile UI rule: never require keyboard input unless the app clearly says a keyboard is required.
