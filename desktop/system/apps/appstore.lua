@@ -11,7 +11,7 @@ local function parse(data)
  for line in data:gmatch("[^\r\n]+") do
   if line~="" and line:sub(1,1)~="#" then
    local id,name,ver,author,target,desc,path=line:match("^([^|]+)|([^|]+)|([^|]+)|([^|]+)|([^|]+)|([^|]+)|(.+)$")
-   if id and (target=="desktop" or target=="all") then table.insert(out,{id=id,name=name,version=ver,author=author,description=desc,path=path}) end
+   if id and (target=="desktop" or target=="all" or target=="both") then table.insert(out,{id=id,name=name,version=ver,author=author,description=desc,path=path}) end
   end
  end
  return out
