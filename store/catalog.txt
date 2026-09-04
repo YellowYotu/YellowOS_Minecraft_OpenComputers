@@ -1,0 +1,2 @@
+# YellowStore catalog
+# id|name|version|author|target|description|path
