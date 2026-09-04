@@ -1,0 +1,6 @@
+version=0.1.0
+size=12000
+init.lua
+system/boot.lua
+system/common.lua
+system/main.lua
