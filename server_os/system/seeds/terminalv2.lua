@@ -2,51 +2,74 @@ local component = rawget(_G, "component")
 local computer = rawget(_G, "computer")
 if not component or not computer then return end
 
-local gpuAddr = component.list("gpu")()
-local screenAddr = component.list("screen")()
-local keyboardAddr = component.list("keyboard")()
-if not gpuAddr or not screenAddr then return end
-local gpu = component.proxy(gpuAddr)
-gpu.bind(screenAddr)
-local w, h = gpu.getResolution()
+local gpuAddress = component.list("gpu")()
+local screenAddress = component.list("screen")()
+local keyboardAddress = component.list("keyboard")()
+if not gpuAddress or not screenAddress then return end
 
-if not keyboardAddr then
-  gpu.setBackground(0x000000); gpu.setForeground(0xFFFFFF); gpu.fill(1,1,w,h," ")
-  gpu.set(2,2,"TerminalV2 requires a keyboard.")
+local gpu = component.proxy(gpuAddress)
+gpu.bind(screenAddress)
+local width, height = gpu.getResolution()
+
+local function clear()
+  gpu.setBackground(0x000000)
+  gpu.setForeground(0xFFFFFF)
+  gpu.fill(1, 1, width, height, " ")
+end
+
+if not keyboardAddress then
+  clear()
+  gpu.set(2, 2, "TerminalV2 requires a keyboard.")
   computer.pullSignal(2)
   return
 end
 
-local fsAddr = computer.getBootAddress()
-local fs = fsAddr and component.proxy(fsAddr) or nil
-if not fs then return end
+local bootAddress = computer.getBootAddress()
+if not bootAddress then return end
 
+local activeAddress = bootAddress
+local activeFs = component.proxy(activeAddress)
 local cwd = "/"
-local activeFs = fs
-local activeAddr = fsAddr
 local input = ""
 local cursor = 1
+local output = {}
+local commands = {}
+local commandPos = 1
 local scroll = 0
-local history = {}
-local commandHistory = {}
-local historyPos = 1
 local running = true
 local hostname = "yellowos"
 
-local KEY_ENTER, KEY_BACKSPACE, KEY_UP, KEY_DOWN = 28,14,200,208
-local KEY_LEFT, KEY_RIGHT, KEY_END, KEY_DELETE = 203,205,207,211
+local KEY_ENTER = 28
+local KEY_BACKSPACE = 14
+local KEY_UP = 200
+local KEY_DOWN = 208
+local KEY_LEFT = 203
+local KEY_RIGHT = 205
 local KEY_HOME = 199
+local KEY_END = 207
+local KEY_DELETE = 211
 
-local function norm(path)
+local function formatBytes(value)
+  value = tonumber(value) or 0
+  if value >= 1048576 then return string.format("%.2fM", value / 1048576) end
+  if value >= 1024 then return string.format("%.1fK", value / 1024) end
+  return tostring(value) .. "B"
+end
+
+local function normalize(path)
   path = tostring(path or "")
   if path == "" then return cwd end
-  local full = path:sub(1,1) == "/" and path or (cwd == "/" and "/"..path or cwd.."/"..path)
-  local out = {}
-  for p in full:gmatch("[^/]+") do
-    if p == ".." then table.remove(out)
-    elseif p ~= "." and p ~= "" then out[#out+1] = p end
+  local full
+  if path:sub(1, 1) == "/" then full = path
+  elseif cwd == "/" then full = "/" .. path
+  else full = cwd .. "/" .. path end
+
+  local parts = {}
+  for part in full:gmatch("[^/]+") do
+    if part == ".." then table.remove(parts)
+    elseif part ~= "." and part ~= "" then parts[#parts + 1] = part end
   end
-  return "/"..table.concat(out,"/")
+  return "/" .. table.concat(parts, "/")
 end
 
 local function readAll(path)
@@ -74,207 +97,313 @@ local function listIterator(path)
   local result = activeFs.list(path)
   if type(result) == "function" then return result end
   if type(result) == "table" then
-    local i = 0
-    return function() i=i+1; return result[i] end
+    local index = 0
+    return function()
+      index = index + 1
+      return result[index]
+    end
   end
   return function() return nil end
 end
 
-local function push(line)
-  line = tostring(line or "")
-  for part in (line.."\n"):gmatch("(.-)\n") do history[#history+1] = part end
-  while #history > 500 do table.remove(history,1) end
+local function printLine(text)
+  text = tostring(text or "")
+  for line in (text .. "\n"):gmatch("(.-)\n") do output[#output + 1] = line end
+  while #output > 600 do table.remove(output, 1) end
   scroll = 0
 end
 
-local function bytes(n)
-  n = tonumber(n) or 0
-  if n >= 1048576 then return string.format("%.2fM", n/1048576) end
-  if n >= 1024 then return string.format("%.1fK", n/1024) end
-  return tostring(n).."B"
-end
-
 local function prompt()
-  local short = cwd == "/" and "/" or cwd
-  return "root@"..hostname..":"..short.."# "
+  return "root@" .. hostname .. ":" .. cwd .. "# "
 end
 
 local function redraw()
-  gpu.setBackground(0x000000); gpu.setForeground(0xFFFFFF); gpu.fill(1,1,w,h," ")
-  local visible = h - 2
-  local endIndex = math.max(0, #history - scroll)
-  local startIndex = math.max(1, endIndex - visible + 1)
+  clear()
+  local visible = height - 1
+  local last = math.max(0, #output - scroll)
+  local first = math.max(1, last - visible + 1)
   local y = 1
-  for i=startIndex,endIndex do
-    gpu.set(1,y,(history[i] or ""):sub(1,w)); y=y+1
+  for i = first, last do
+    gpu.set(1, y, tostring(output[i]):sub(1, width))
+    y = y + 1
   end
+
   local p = prompt()
-  gpu.setForeground(0xFFFFFF)
-  gpu.set(1,h,(p..input):sub(math.max(1,#p+#input-w+1)))
-  local absolute = #p + cursor - 1
-  local shownStart = math.max(1,#p+#input-w+1)
-  local cx = absolute - shownStart + 1
-  if cx >= 1 and cx <= w then
-    local ch = input:sub(cursor,cursor)
+  local full = p .. input
+  local start = math.max(1, #full - width + 1)
+  gpu.set(1, height, full:sub(start, start + width - 1))
+
+  local absoluteCursor = #p + cursor - 1
+  local cursorX = absoluteCursor - start + 1
+  if cursorX >= 1 and cursorX <= width then
+    local ch = input:sub(cursor, cursor)
     if ch == "" then ch = " " end
-    gpu.setBackground(0xFFFFFF); gpu.setForeground(0x000000); gpu.set(cx,h,ch)
-    gpu.setBackground(0x000000); gpu.setForeground(0xFFFFFF)
+    gpu.setBackground(0xFFFFFF)
+    gpu.setForeground(0x000000)
+    gpu.set(cursorX, height, ch)
+    gpu.setBackground(0x000000)
+    gpu.setForeground(0xFFFFFF)
   end
 end
 
 local function split(line)
-  local t = {}
-  local current, quote = "", nil
-  local i = 1
-  while i <= #line do
-    local ch = line:sub(i,i)
+  local result = {}
+  local current = ""
+  local quote = nil
+  for i = 1, #line do
+    local ch = line:sub(i, i)
     if quote then
       if ch == quote then quote = nil else current = current .. ch end
-    elseif ch == '"' or ch == "'" then quote = ch
+    elseif ch == "'" or ch == '"' then quote = ch
     elseif ch:match("%s") then
-      if #current > 0 then t[#t+1]=current; current="" end
+      if current ~= "" then result[#result + 1] = current; current = "" end
     else current = current .. ch end
-    i=i+1
   end
-  if #current > 0 then t[#t+1]=current end
-  return t
+  if current ~= "" then result[#result + 1] = current end
+  return result
 end
 
-local function copyFile(src,dst)
-  src,dst=norm(src),norm(dst)
-  local data,reason=readAll(src); if not data then return false,reason end
-  return writeAll(dst,data)
+local function copyFile(source, destination)
+  source = normalize(source)
+  destination = normalize(destination)
+  local data, reason = readAll(source)
+  if not data then return false, reason end
+  return writeAll(destination, data)
 end
 
-local function cmd_ls(a)
-  local path = norm(a[2] or cwd)
-  if not activeFs.exists(path) then push("ls: cannot access '"..path.."': No such file or directory"); return end
-  if not activeFs.isDirectory(path) then push(path); return end
-  local items={}
-  for name in listIterator(path) do items[#items+1]=name end
-  table.sort(items)
-  local line=""
-  for _,name in ipairs(items) do
-    local entry = name
-    if #line + #entry + 2 > w then push(line); line=entry else line = line=="" and entry or line.."  "..entry end
+local function list(path)
+  path = normalize(path or cwd)
+  if not activeFs.exists(path) then
+    printLine("ls: cannot access '" .. path .. "': No such file or directory")
+    return
   end
-  if line~="" then push(line) end
+  if not activeFs.isDirectory(path) then printLine(path); return end
+
+  local entries = {}
+  for name in listIterator(path) do entries[#entries + 1] = name end
+  table.sort(entries)
+  local line = ""
+  for _, name in ipairs(entries) do
+    if #line + #name + 2 > width then
+      printLine(line)
+      line = name
+    else
+      line = line == "" and name or line .. "  " .. name
+    end
+  end
+  if line ~= "" then printLine(line) end
 end
 
-local function cmd_cat(a)
-  if not a[2] then push("cat: missing operand"); return end
-  local d,r=readAll(norm(a[2])); if not d then push("cat: "..tostring(r)) else push(d) end
-end
-
-local function cmd_edit(a)
-  local path=norm(a[2] or "new.lua")
-  push("TerminalV2 editor - type lines, :wq saves, :q cancels")
-  redraw()
-  local lines={}
+local function editor(path)
+  path = normalize(path or "new.lua")
+  clear()
+  gpu.set(1, 1, "TerminalV2 editor: :wq save | :q cancel | END cancel")
+  local lines = {}
   while true do
-    local line=""
+    local line = ""
     while true do
-      gpu.setBackground(0x000000); gpu.setForeground(0xFFFFFF); gpu.fill(1,h,w,1," "); gpu.set(1,h,(tostring(#lines+1).."> "..line):sub(1,w))
-      local e={computer.pullSignal()}
-      if e[1]=="clipboard" then line=line..tostring(e[3] or ""):gsub("[\r\n]","")
-      elseif e[1]=="key_down" then
-        local ch,code=e[3] or 0,e[4] or 0
-        if code==KEY_END then return
-        elseif code==KEY_ENTER or ch==13 then break
-        elseif code==KEY_BACKSPACE or ch==8 then line=line:sub(1,-2)
-        elseif ch>=32 and ch<=126 then line=line..string.char(ch) end
+      gpu.setBackground(0x000000); gpu.setForeground(0xFFFFFF)
+      gpu.fill(1, height, width, 1, " ")
+      gpu.set(1, height, (tostring(#lines + 1) .. "> " .. line):sub(1, width))
+      local event = {computer.pullSignal()}
+      if event[1] == "clipboard" then
+        line = line .. tostring(event[3] or ""):gsub("[\r\n]", "")
+      elseif event[1] == "key_down" then
+        local char, code = event[3] or 0, event[4] or 0
+        if code == KEY_END then printLine("Edit cancelled."); return end
+        if code == KEY_ENTER or char == 13 then break end
+        if code == KEY_BACKSPACE or char == 8 then line = line:sub(1, -2)
+        elseif char >= 32 and char <= 126 then line = line .. string.char(char) end
       end
     end
-    if line==":q" then push("Cancelled"); return end
-    if line==":wq" then local ok,r=writeAll(path,table.concat(lines,"\n")..(#lines>0 and "\n" or "")); push(ok and "Saved "..path or "edit: "..tostring(r)); return end
-    lines[#lines+1]=line
+    if line == ":q" then printLine("Edit cancelled."); return end
+    if line == ":wq" then
+      local ok, reason = writeAll(path, table.concat(lines, "\n") .. (#lines > 0 and "\n" or ""))
+      printLine(ok and ("Saved " .. path) or ("edit: " .. tostring(reason)))
+      return
+    end
+    lines[#lines + 1] = line
   end
 end
 
-local function cmd_wget(a)
-  if not a[2] or not a[3] then push("Usage: wget <url> <file>"); return end
-  local internetAddr=component.list("internet")(); if not internetAddr then push("wget: no internet card"); return end
-  local internet=component.proxy(internetAddr)
-  local ok,req=pcall(internet.request,a[2]); if not ok or not req then push("wget: request failed"); return end
-  local data=""
-  while true do local chunk=req.read and req.read(math.huge) or nil; if not chunk then break end; data=data..chunk end
-  if req.close then pcall(req.close) end
-  local wr,r=writeAll(norm(a[3]),data); push(wr and ("Downloaded "..#data.." bytes") or "wget: "..tostring(r))
+local function wget(url, path)
+  if not url or not path then printLine("Usage: wget <url> <file>"); return end
+  local internetAddress = component.list("internet")()
+  if not internetAddress then printLine("wget: Internet Card not found"); return end
+  local internet = component.proxy(internetAddress)
+  local ok, request = pcall(internet.request, url)
+  if not ok or not request then printLine("wget: request failed"); return end
+  local data = ""
+  while true do
+    local chunk = request.read and request.read(math.huge) or nil
+    if not chunk then break end
+    data = data .. chunk
+  end
+  if request.close then pcall(request.close) end
+  local saved, reason = writeAll(normalize(path), data)
+  printLine(saved and ("Downloaded " .. tostring(#data) .. " bytes") or ("wget: " .. tostring(reason)))
 end
 
 local function execute(line)
-  local a=split(line); local cmd=(a[1] or ""):lower(); if cmd=="" then return end
-  if cmd=="help" then
-    push("OpenOS-style commands:")
-    push("ls cd pwd cat echo clear cp mv rm mkdir rmdir touch edit")
-    push("df mount label components uptime free wget lua run reboot shutdown exit help")
-  elseif cmd=="ls" or cmd=="dir" then cmd_ls(a)
-  elseif cmd=="cd" then
-    local p=norm(a[2] or "/"); if activeFs.exists(p) and activeFs.isDirectory(p) then cwd=p else push("cd: no such directory: "..p) end
-  elseif cmd=="pwd" then push(cwd)
-  elseif cmd=="cat" or cmd=="type" then cmd_cat(a)
-  elseif cmd=="echo" then
-    local text=line:match("^%S+%s*(.-)%s*>%s*(%S+)%s*$")
-    local out=line:match(">%s*(%S+)%s*$")
-    if out and text then local ok,r=writeAll(norm(out),text.."\n"); if not ok then push("echo: "..tostring(r)) end else push(line:match("^%S+%s*(.*)$") or "") end
-  elseif cmd=="clear" or cmd=="cls" then history={}
-  elseif cmd=="cp" then local ok,r=copyFile(a[2] or "",a[3] or ""); push(ok and "" or "cp: "..tostring(r))
-  elseif cmd=="mv" then local ok,r=copyFile(a[2] or "",a[3] or ""); if ok then activeFs.remove(norm(a[2])); else push("mv: "..tostring(r)) end
-  elseif cmd=="rm" or cmd=="rmdir" then if not a[2] then push(cmd..": missing operand") else local ok,r=activeFs.remove(norm(a[2])); if not ok then push(cmd..": "..tostring(r)) end end
-  elseif cmd=="mkdir" then if not a[2] then push("mkdir: missing operand") else local ok,r=activeFs.makeDirectory(norm(a[2])); if not ok then push("mkdir: "..tostring(r)) end end
-  elseif cmd=="touch" then if not a[2] then push("touch: missing operand") elseif activeFs.exists(norm(a[2])) then else local ok,r=writeAll(norm(a[2]),""); if not ok then push("touch: "..tostring(r)) end end
-  elseif cmd=="edit" then cmd_edit(a)
-  elseif cmd=="df" then push("Filesystem  Used  Free  Total"); push(activeAddr:sub(1,8).."  "..bytes(activeFs.spaceUsed()).."  "..bytes(activeFs.spaceTotal()-activeFs.spaceUsed()).."  "..bytes(activeFs.spaceTotal()))
-  elseif cmd=="mount" then
-    for addr in component.list("filesystem") do local f=component.proxy(addr); push(addr:sub(1,8).."  "..tostring(f.getLabel() or "").."  "..bytes(f.spaceUsed()).."/"..bytes(f.spaceTotal())) end
-    push("Use: mount <address-prefix>")
-  elseif cmd=="label" then
-    if a[2] then local ok,r=pcall(activeFs.setLabel,a[2]); if not ok then push("label: "..tostring(r)) end else push(tostring(activeFs.getLabel() or "")) end
-  elseif cmd=="components" then for addr,typ in component.list() do push(typ.."  "..addr) end
-  elseif cmd=="uptime" then push(string.format("%.1f seconds",computer.uptime()))
-  elseif cmd=="free" then push("Memory: "..bytes(computer.freeMemory()).." free / "..bytes(computer.totalMemory()).." total")
-  elseif cmd=="wget" then cmd_wget(a)
-  elseif cmd=="lua" or cmd=="run" then
-    local pth=norm(a[2] or ""); local d,r=readAll(pth); if not d then push(cmd..": "..tostring(r)) else local fn,e=load(d,"="..pth,"t",_ENV); if not fn then push("lua: "..tostring(e)) else local ok,res=pcall(fn); if not ok then push("lua: "..tostring(res)) elseif res~=nil then push(tostring(res)) end end end
-  elseif cmd=="reboot" then computer.shutdown(true)
-  elseif cmd=="shutdown" then computer.shutdown(false)
-  elseif cmd=="exit" then running=false
-  elseif cmd=="mountfs" or (cmd=="mount" and a[2]) then
-    local prefix=a[2] or ""; for addr in component.list("filesystem") do if addr:sub(1,#prefix)==prefix then activeAddr=addr; activeFs=component.proxy(addr); cwd="/"; push("Mounted "..addr); return end end; push("mount: filesystem not found")
-  else push(cmd..": command not found") end
-end
+  local args = split(line)
+  local cmd = (args[1] or ""):lower()
+  if cmd == "" then return end
 
-push("OpenOS 1.7 compatible shell - TerminalV2 1.0.0")
-push("Type 'help' for commands. END exits TerminalV2.")
-
-while running do
-  redraw()
-  local e={computer.pullSignal()}
-  if e[1]=="clipboard" then
-    local txt=tostring(e[3] or ""):gsub("[\r\n]","")
-    input=input:sub(1,cursor-1)..txt..input:sub(cursor); cursor=cursor+#txt
-  elseif e[1]=="scroll" then
-    local dir=e[5] or 0; if dir>0 then scroll=math.min(#history,scroll+3) else scroll=math.max(0,scroll-3) end
-  elseif e[1]=="key_down" then
-    local ch,code=e[3] or 0,e[4] or 0
-    if code==KEY_END then running=false
-    elseif code==KEY_ENTER or ch==13 then
-      local line=input; input=""; cursor=1; push(prompt()..line)
-      if line~="" then commandHistory[#commandHistory+1]=line; historyPos=#commandHistory+1 end
-      execute(line)
-    elseif code==KEY_BACKSPACE or ch==8 then
-      if cursor>1 then input=input:sub(1,cursor-2)..input:sub(cursor); cursor=cursor-1 end
-    elseif code==KEY_DELETE then
-      if cursor<=#input then input=input:sub(1,cursor-1)..input:sub(cursor+1) end
-    elseif code==KEY_LEFT then cursor=math.max(1,cursor-1)
-    elseif code==KEY_RIGHT then cursor=math.min(#input+1,cursor+1)
-    elseif code==KEY_HOME then cursor=1
-    elseif code==KEY_UP then
-      if #commandHistory>0 then historyPos=math.max(1,historyPos-1); input=commandHistory[historyPos] or ""; cursor=#input+1 end
-    elseif code==KEY_DOWN then
-      if #commandHistory>0 then historyPos=math.min(#commandHistory+1,historyPos+1); input=commandHistory[historyPos] or ""; cursor=#input+1 end
-    elseif ch>=32 and ch<=126 then input=input:sub(1,cursor-1)..string.char(ch)..input:sub(cursor); cursor=cursor+1 end
+  if cmd == "help" then
+    printLine("TerminalV2 OpenOS-style shell commands:")
+    printLine("ls cd pwd cat echo clear cp mv rm rmdir mkdir touch edit")
+    printLine("df mount label components uptime free wget lua run")
+    printLine("reboot shutdown exit help")
+  elseif cmd == "ls" or cmd == "dir" then
+    list(args[2])
+  elseif cmd == "cd" then
+    local path = normalize(args[2] or "/")
+    if activeFs.exists(path) and activeFs.isDirectory(path) then cwd = path
+    else printLine("cd: no such directory: " .. path) end
+  elseif cmd == "pwd" then
+    printLine(cwd)
+  elseif cmd == "cat" or cmd == "type" then
+    if not args[2] then printLine("cat: missing operand")
+    else local data, reason = readAll(normalize(args[2])); printLine(data or ("cat: " .. tostring(reason))) end
+  elseif cmd == "echo" then
+    local redirect = line:match(">%s*(%S+)%s*$")
+    if redirect then
+      local text = line:match("^%S+%s*(.-)%s*>%s*%S+%s*$") or ""
+      local ok, reason = writeAll(normalize(redirect), text .. "\n")
+      if not ok then printLine("echo: " .. tostring(reason)) end
+    else
+      printLine(line:match("^%S+%s*(.*)$") or "")
+    end
+  elseif cmd == "clear" or cmd == "cls" then
+    output = {}
+  elseif cmd == "cp" then
+    if not args[2] or not args[3] then printLine("cp: missing operand")
+    else local ok, reason = copyFile(args[2], args[3]); if not ok then printLine("cp: " .. tostring(reason)) end end
+  elseif cmd == "mv" then
+    if not args[2] or not args[3] then printLine("mv: missing operand")
+    else
+      local ok, reason = copyFile(args[2], args[3])
+      if ok then activeFs.remove(normalize(args[2])) else printLine("mv: " .. tostring(reason)) end
+    end
+  elseif cmd == "rm" or cmd == "rmdir" then
+    if not args[2] then printLine(cmd .. ": missing operand")
+    else local ok, reason = activeFs.remove(normalize(args[2])); if not ok then printLine(cmd .. ": " .. tostring(reason)) end end
+  elseif cmd == "mkdir" then
+    if not args[2] then printLine("mkdir: missing operand")
+    else local ok, reason = activeFs.makeDirectory(normalize(args[2])); if not ok then printLine("mkdir: " .. tostring(reason)) end end
+  elseif cmd == "touch" then
+    if not args[2] then printLine("touch: missing operand")
+    elseif not activeFs.exists(normalize(args[2])) then
+      local ok, reason = writeAll(normalize(args[2]), "")
+      if not ok then printLine("touch: " .. tostring(reason)) end
+    end
+  elseif cmd == "edit" then
+    editor(args[2])
+  elseif cmd == "df" then
+    local used = activeFs.spaceUsed()
+    local total = activeFs.spaceTotal()
+    printLine("Filesystem  Used  Free  Total")
+    printLine(activeAddress:sub(1, 8) .. "  " .. formatBytes(used) .. "  " .. formatBytes(total - used) .. "  " .. formatBytes(total))
+  elseif cmd == "mount" and args[2] then
+    local prefix = args[2]
+    local found
+    for address in component.list("filesystem") do
+      if address:sub(1, #prefix) == prefix then found = address; break end
+    end
+    if found then
+      activeAddress = found
+      activeFs = component.proxy(found)
+      cwd = "/"
+      printLine("Mounted " .. found)
+    else printLine("mount: filesystem not found") end
+  elseif cmd == "mount" then
+    for address in component.list("filesystem") do
+      local proxy = component.proxy(address)
+      printLine(address:sub(1, 8) .. "  " .. tostring(proxy.getLabel() or "") .. "  " .. formatBytes(proxy.spaceUsed()) .. "/" .. formatBytes(proxy.spaceTotal()))
+    end
+    printLine("mount <address-prefix> switches the active filesystem")
+  elseif cmd == "label" then
+    if args[2] then
+      local ok, reason = pcall(activeFs.setLabel, args[2])
+      if not ok then printLine("label: " .. tostring(reason)) end
+    else printLine(tostring(activeFs.getLabel() or "")) end
+  elseif cmd == "components" then
+    for address, kind in component.list() do printLine(kind .. "  " .. address) end
+  elseif cmd == "uptime" then
+    printLine(string.format("%.1f seconds", computer.uptime()))
+  elseif cmd == "free" then
+    printLine("Memory: " .. formatBytes(computer.freeMemory()) .. " free / " .. formatBytes(computer.totalMemory()) .. " total")
+  elseif cmd == "wget" then
+    wget(args[2], args[3])
+  elseif cmd == "lua" or cmd == "run" then
+    if not args[2] then printLine(cmd .. ": missing file")
+    else
+      local path = normalize(args[2])
+      local data, reason = readAll(path)
+      if not data then printLine(cmd .. ": " .. tostring(reason))
+      else
+        local program, compileReason = load(data, "=" .. path, "t", _ENV)
+        if not program then printLine("lua: " .. tostring(compileReason))
+        else
+          local ok, result = pcall(program)
+          if not ok then printLine("lua: " .. tostring(result)) elseif result ~= nil then printLine(tostring(result)) end
+        end
+      end
+    end
+  elseif cmd == "reboot" then
+    computer.shutdown(true)
+  elseif cmd == "shutdown" then
+    computer.shutdown(false)
+  elseif cmd == "exit" then
+    running = false
+  else
+    printLine(cmd .. ": command not found")
   end
 end
 
-gpu.setBackground(0x000000); gpu.setForeground(0xFFFFFF); gpu.fill(1,1,w,h," ")
+printLine("TerminalV2 1.0.0 - OpenOS-style shell")
+printLine("Type 'help' for commands. END exits.")
+
+while running do
+  redraw()
+  local event = {computer.pullSignal()}
+  if event[1] == "clipboard" then
+    local text = tostring(event[3] or ""):gsub("[\r\n]", "")
+    input = input:sub(1, cursor - 1) .. text .. input:sub(cursor)
+    cursor = cursor + #text
+  elseif event[1] == "scroll" then
+    local direction = event[5] or 0
+    if direction > 0 then scroll = math.min(#output, scroll + 3) else scroll = math.max(0, scroll - 3) end
+  elseif event[1] == "key_down" then
+    local char, code = event[3] or 0, event[4] or 0
+    if code == KEY_END then
+      running = false
+    elseif code == KEY_ENTER or char == 13 then
+      local line = input
+      input = ""
+      cursor = 1
+      printLine(prompt() .. line)
+      if line ~= "" then commands[#commands + 1] = line; commandPos = #commands + 1 end
+      execute(line)
+    elseif code == KEY_BACKSPACE or char == 8 then
+      if cursor > 1 then input = input:sub(1, cursor - 2) .. input:sub(cursor); cursor = cursor - 1 end
+    elseif code == KEY_DELETE then
+      if cursor <= #input then input = input:sub(1, cursor - 1) .. input:sub(cursor + 1) end
+    elseif code == KEY_LEFT then
+      cursor = math.max(1, cursor - 1)
+    elseif code == KEY_RIGHT then
+      cursor = math.min(#input + 1, cursor + 1)
+    elseif code == KEY_HOME then
+      cursor = 1
+    elseif code == KEY_UP then
+      if #commands > 0 then commandPos = math.max(1, commandPos - 1); input = commands[commandPos] or ""; cursor = #input + 1 end
+    elseif code == KEY_DOWN then
+      if #commands > 0 then commandPos = math.min(#commands + 1, commandPos + 1); input = commands[commandPos] or ""; cursor = #input + 1 end
+    elseif char >= 32 and char <= 126 then
+      input = input:sub(1, cursor - 1) .. string.char(char) .. input:sub(cursor)
+      cursor = cursor + 1
+    end
+  end
+end
+
+clear()
