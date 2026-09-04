@@ -6,7 +6,7 @@ local gpu=c.gpu
 local activeFs=YellowOS.fs
 local activeAddress=YellowOS.bootAddress
 local cwd="/"
-local history={"YellowOS Development Terminal 0.1.0","Type 'help' for commands."}
+local history={"YellowOS Development Terminal","Type 'help' for commands. Ctrl+V paste. END exits."}
 local input=""
 
 local function norm(path)
@@ -39,7 +39,9 @@ local function split(s) local t={}; for x in tostring(s):gmatch("%S+") do table.
 local function list(path)
  path=norm(path); if not activeFs.exists(path) then return "Not found: "..path end
  if not activeFs.isDirectory(path) then return path end
- local out={}; for name in activeFs.list(path) do table.insert(out,name) end; table.sort(out); return table.concat(out,"  ")
+ local out={}; local result=activeFs.list(path)
+ if type(result)=="table" then for _,name in ipairs(result) do table.insert(out,name) end elseif type(result)=="function" then for name in result do table.insert(out,name) end end
+ table.sort(out); return table.concat(out,"  ")
 end
 local function edit(path)
  path=norm(path); local old=read(activeFs,path) or ""; local lines={}; for line in (old.."\n"):gmatch("(.-)\n") do table.insert(lines,line) end
@@ -78,8 +80,11 @@ end
 
 while true do
  redraw(); local e={computer.pullSignal()}
- if e[1]=="key_down" then local ch,code=e[3] or 0,e[4] or 0
-  if code==c.KEY_ENTER or ch==13 then local line=input; input=""; add("> "..line); if command(line)=="exit" then return end
+ if e[1]=="clipboard" then
+  input=input..tostring(e[3] or ""):gsub("[\r\n]","")
+ elseif e[1]=="key_down" then local ch,code=e[3] or 0,e[4] or 0
+  if code==c.KEY_END then return
+  elseif code==c.KEY_ENTER or ch==13 then local line=input; input=""; add("> "..line); if command(line)=="exit" then return end
   elseif code==c.KEY_BACKSPACE or ch==8 then input=input:sub(1,-2)
   elseif ch>=32 and ch<=126 then input=input..string.char(ch) end
  end
