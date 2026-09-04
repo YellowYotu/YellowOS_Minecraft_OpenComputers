@@ -1,45 +1,10 @@
-local common = YellowOS.common
-local computer = rawget(_G, "computer")
-
-if not computer then
-    error("OpenComputers boot environment is missing computer global")
-end
-
-local items = {
-    "Files",
-    "Terminal",
-    "Settings",
-    "About",
-    "Reboot",
-    "Shutdown"
-}
-
+local computer=rawget(_G,"computer")
+local c=YellowOS.common
+local items={{"Files","/system/apps/files.lua"},{"Terminal","/system/apps/terminal.lua"},{"Browser","/system/apps/browser.lua"},{"Updates","/system/apps/updates.lua"},{"Settings","/system/apps/settings.lua"},{"About","/system/apps/about.lua"},{"Reboot"},{"Shutdown"}}
 while true do
-    local selected = common.menu("Desktop Edition " .. YellowOS.version, "YellowOS Desktop", items)
-    if not selected then
-        selected = 4
-    end
-
-    if selected == 1 then
-        common.header("Files")
-        common.gpu.set(3, 6, "Files app coming next.")
-        computer.pullSignal(1)
-    elseif selected == 2 then
-        common.header("Terminal")
-        common.gpu.set(3, 6, "Terminal app coming next.")
-        computer.pullSignal(1)
-    elseif selected == 3 then
-        common.header("Settings")
-        common.gpu.set(3, 6, "Settings app coming next.")
-        computer.pullSignal(1)
-    elseif selected == 4 then
-        common.header("About")
-        common.gpu.set(3, 6, "YellowOS Desktop Edition")
-        common.gpu.set(3, 7, "Version " .. YellowOS.version)
-        computer.pullSignal(1.5)
-    elseif selected == 5 then
-        computer.shutdown(true)
-    elseif selected == 6 then
-        computer.shutdown(false)
-    end
+ local names={}; for _,it in ipairs(items) do table.insert(names,it[1]) end
+ local sub="Desktop Edition"
+ if YellowOS.pendingUpdate then sub=sub.." | Update "..YellowOS.pendingUpdate.version.." available" end
+ local s=c.menu("Desktop "..YellowOS.version,sub,names)
+ if s then local it=items[s]; if it[2] then YellowOS.loadFile(it[2]) elseif it[1]=="Reboot" then computer.shutdown(true) elseif it[1]=="Shutdown" then computer.shutdown(false) end end
 end
