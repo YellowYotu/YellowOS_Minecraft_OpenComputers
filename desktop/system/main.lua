@@ -1,5 +1,9 @@
 local common = YellowOS.common
-local computer = require("computer")
+local computer = rawget(_G, "computer")
+
+if not computer then
+    error("OpenComputers boot environment is missing computer global")
+end
 
 local items = {
     "Files",
