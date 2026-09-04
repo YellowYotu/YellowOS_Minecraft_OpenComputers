@@ -1,4 +1,4 @@
-version=0.2.7
+version=0.2.8
 size=55000
 init.lua
 system/boot.lua
