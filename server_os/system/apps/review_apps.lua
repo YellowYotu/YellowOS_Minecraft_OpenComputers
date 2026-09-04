@@ -20,11 +20,24 @@ local function parseMeta(data)
     return a
 end
 
+local function listIterator(path)
+    local result = fs.list(path)
+    if type(result) == "function" then return result end
+    if type(result) == "table" then
+        local i = 0
+        return function()
+            i = i + 1
+            return result[i]
+        end
+    end
+    return function() return nil end
+end
+
 local function pendingList()
     local list = {}
     if not fs.exists("/store/pending") then return list end
-    for name in fs.list("/store/pending") do
-        local sid = name:match("^(.-)%.meta$")
+    for name in listIterator("/store/pending") do
+        local sid = tostring(name):match("^(.-)%.meta$")
         if sid then
             local meta = parseMeta(read("/store/pending/"..sid..".meta") or "")
             meta.sid = sid
@@ -51,13 +64,13 @@ local function preview(app)
             y=y+1
         end
         common.gpu.setForeground(0x808080)
-        common.gpu.set(3,common.height-1,"UP/DOWN scroll   BACKSPACE back")
+        common.gpu.set(3,common.height-1,"UP/DOWN scroll   END back")
         local e={computer.pullSignal()}
         if e[1]=="key_down" then
             local codeKey=e[4] or 0
             if codeKey==common.KEY_UP then offset=math.max(1,offset-1)
             elseif codeKey==common.KEY_DOWN then offset=math.min(math.max(1,#lines),offset+1)
-            elseif codeKey==common.KEY_BACKSPACE then return end
+            elseif codeKey==common.KEY_END or codeKey==common.KEY_BACKSPACE then return end
         elseif YellowOS.appserver then YellowOS.appserver.processSignal(table.unpack(e)) end
     end
 end
