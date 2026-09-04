@@ -1,0 +1,26 @@
+NETWORKING
+
+Wireless Network Card / modem:
+  local modemAddress = component.list("modem")()
+  local modem = component.proxy(modemAddress)
+  modem.open(port)
+  modem.broadcast(port, "MESSAGE", value)
+
+Incoming packet:
+  local e = {computer.pullSignal()}
+  if e[1] == "modem_message" then
+    local receiver = e[2]
+    local sender   = e[3]
+    local port     = e[4]
+    local distance = e[5]
+    local kind     = e[6]
+  end
+
+YellowStore developer submissions use port 24121.
+Do not use YellowOS system ports for unrelated applications unless you intentionally implement the protocol.
+
+Internet Card:
+  YellowOS.http.get(url)
+returns responseText or nil,error.
+
+Applications should check that the required card exists and show a useful error instead of crashing.
