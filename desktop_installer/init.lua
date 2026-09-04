@@ -1,5 +1,9 @@
-local component = require("component")
-local computer = require("computer")
+local component = rawget(_G, "component")
+local computer = rawget(_G, "computer")
+
+if not component or not computer then
+    error("OpenComputers boot environment is missing component/computer globals")
+end
 
 local installerAddress = computer.getBootAddress()
 local gpuAddress = component.list("gpu")()
