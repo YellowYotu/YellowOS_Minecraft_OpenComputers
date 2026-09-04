@@ -5,5 +5,5 @@ local boot=computer.getBootAddress(); if not boot then error("Boot drive not fou
 local fs=component.proxy(boot)
 local function read(path) local h,r=fs.open(path,"r"); if not h then return nil,r end; local d=""; while true do local c=fs.read(h,2048); if not c then break end; d=d..c end; fs.close(h); return d end
 local function loadFile(path) local d,r=read(path); if not d then error("Cannot open "..path..": "..tostring(r)) end; local p,e=load(d,"="..path,"t",_ENV); if not p then error(e) end; return p() end
-_G.YellowOS={fs=fs,bootAddress=boot,readAll=read,loadFile=loadFile,version="0.1.0",edition="Development Edition",device="Development PC"}
+_G.YellowOS={fs=fs,bootAddress=boot,readAll=read,loadFile=loadFile,version="0.1.1",edition="Development Edition",device="Development PC"}
 loadFile("/system/boot.lua")
