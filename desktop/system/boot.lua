@@ -8,9 +8,10 @@ c.clear(); c.gpu.setForeground(0xFFD23F); c.gpu.set(3,3,"YellowOS Desktop"); c.g
 local manifest=YellowOS.updater.check()
 if manifest and manifest.updateAvailable then
  if YellowOS.settings.autoUpdates then
-  local ok=YellowOS.updater.install(manifest); if ok then computer.shutdown(true) end
+  local ok,er=YellowOS.updater.install(manifest); if ok then computer.shutdown(true) else c.message("Update failed",tostring(er)) end
  else
-  YellowOS.pendingUpdate=manifest
+  local choice=c.menu("Update available","YellowOS Desktop "..manifest.version.." | "..c.formatBytes(manifest.size),{"Install now","Later"})
+  if choice==1 then local ok,er=YellowOS.updater.install(manifest); if ok then computer.shutdown(true) else c.message("Update failed",tostring(er)) end else YellowOS.pendingUpdate=manifest end
  end
 end
 YellowOS.loadFile("/system/main.lua")
