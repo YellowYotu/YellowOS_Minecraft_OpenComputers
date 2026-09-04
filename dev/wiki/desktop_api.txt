@@ -1,0 +1,21 @@
+YELLOWOS DESKTOP API
+
+Desktop information:
+  YellowOS.edition -> "Desktop Edition"
+  YellowOS.version -> installed version
+  YellowOS.fs      -> boot/system disk filesystem proxy
+  YellowOS.common  -> UI helper library
+  YellowOS.http    -> HTTP helper
+
+Desktop common helpers:
+  common.header(title, subtitle)
+  common.footer(text)
+  common.message(title, text)
+  common.menu(title, subtitle, items)
+  common.input(title, prompt, initial)
+  common.formatBytes(bytes)
+
+Desktop systems normally have a keyboard, so desktop-target apps may use key_down input. Mouse clicks on an OpenComputers screen arrive as touch events.
+
+Applications installed by YellowStore live under /apps/<id>/.
+Do not overwrite /system files. Users can create and modify their own programs and files on Desktop Edition.
