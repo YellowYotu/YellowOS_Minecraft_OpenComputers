@@ -27,7 +27,7 @@ local function parseCatalog(data)
     for line in data:gmatch("[^\r\n]+") do
         if line ~= "" and line:sub(1, 1) ~= "#" then
             local id, name, version, author, target, description, path = line:match("^([^|]+)|([^|]+)|([^|]+)|([^|]+)|([^|]+)|([^|]+)|(.+)$")
-            if id and (target == "mobile" or target == "all") then
+            if id and (target == "mobile" or target == "all" or target == "both") then
                 table.insert(apps, {id=id, name=name, version=version, author=author, target=target, description=description, path=path})
             end
         end
