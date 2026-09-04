@@ -71,6 +71,8 @@ end
 network.broadcastPresence()
 
 local items = {
+    {name = "Apps", path = "/system/apps/apps.lua"},
+    {name = "YellowStore", path = "/system/apps/appstore.lua"},
     {name = "Files", path = "/system/apps/files.lua"},
     {name = "Browser", path = "/system/apps/browser.lua"},
     {name = "Terminal", path = "/system/apps/terminal.lua"},
