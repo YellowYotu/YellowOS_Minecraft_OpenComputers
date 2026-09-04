@@ -1,5 +1,5 @@
-version=0.2.4
-size=45000
+version=0.2.5
+size=52000
 init.lua
 system/boot.lua
 system/common.lua
@@ -8,6 +8,8 @@ system/http.lua
 system/updater.lua
 system/network.lua
 system/main.lua
+system/apps/apps.lua
+system/apps/appstore.lua
 system/apps/files.lua
 system/apps/browser.lua
 system/apps/terminal.lua
