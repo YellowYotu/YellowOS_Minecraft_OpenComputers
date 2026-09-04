@@ -1,0 +1,29 @@
+YELLOWOS APP STRUCTURE
+
+YellowStore v1 package:
+  main.lua
+
+When installed, YellowOS stores it as:
+  /apps/<app-id>/main.lua
+  /apps/<app-id>/app.cfg
+
+The app runs in the YellowOS Lua environment. Useful globals normally available:
+  component  - OpenComputers component API
+  computer   - OpenComputers computer API
+  YellowOS   - current OS object
+
+Portable application rules:
+- Do not assume a specific GPU resolution.
+- Detect components before using them.
+- Do not write inside /system.
+- Store your own data under /apps/<id>/data or another user-controlled location.
+- Always allow the user to return from your UI.
+- Mobile apps should support touch.
+- Desktop apps should support keyboard and mouse/touch.
+
+Basic app:
+  local component = rawget(_G, "component")
+  local computer = rawget(_G, "computer")
+  local gpu = component.proxy(component.list("gpu")())
+  gpu.set(2, 2, "Hello from YellowStore")
+  computer.pullSignal(2)
