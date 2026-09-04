@@ -1,5 +1,5 @@
-version=0.2.3
-size=68000
+version=0.2.4
+size=90000
 init.lua
 system/boot.lua
 system/common.lua
@@ -17,3 +17,5 @@ system/apps/info.lua
 system/apps/update_clients.lua
 system/apps/flash_user.lua
 system/apps/update_server.lua
+system/seeds/terminalv2.meta
+system/seeds/terminalv2.lua
