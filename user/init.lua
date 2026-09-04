@@ -1,5 +1,13 @@
-local component = component
-local computer = computer
+local component = rawget(_G, "component")
+local computer = rawget(_G, "computer")
+
+if not component then
+    component = require("component")
+end
+
+if not computer then
+    computer = require("computer")
+end
 
 local bootAddress = computer.getBootAddress()
 
@@ -62,9 +70,10 @@ end
 _G.YellowOS = {
     fs = fs,
     loadFile = loadFile,
-    version = "0.2.3",
+    version = "0.2.4",
     edition = "User Edition",
-    device = device
+    device = device,
+    systemDiskProtected = true
 }
 
 loadFile("/system/boot.lua")
