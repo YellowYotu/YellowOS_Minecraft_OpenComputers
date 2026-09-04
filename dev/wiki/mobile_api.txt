@@ -1,0 +1,23 @@
+YELLOWPAD / MOBILE API
+
+Device information:
+  YellowOS.edition  -> "User Edition"
+  YellowOS.version  -> installed YellowOS version
+  YellowOS.device   -> YellowPad Lite / YellowPad / YellowPad Pro
+  YellowOS.fs       -> system filesystem proxy
+  YellowOS.common   -> YellowOS UI helpers
+  YellowOS.http     -> HTTP helper when Internet Card is installed
+
+UI helpers available on YellowPad:
+  YellowOS.common.header(title, subtitle)
+  YellowOS.common.message(title, text)
+  YellowOS.common.menu(title, subtitle, items)
+  YellowOS.common.formatBytes(bytes)
+
+Input:
+  touch signal:     "touch", screen, x, y, button, player
+  key_down signal:  "key_down", keyboard, char, code, player
+
+Not every YellowPad has a Keyboard component. Mobile apps must remain usable with touch unless they explicitly require a keyboard.
+
+System disk is protected for normal users. YellowStore itself is allowed to install applications under /apps.
