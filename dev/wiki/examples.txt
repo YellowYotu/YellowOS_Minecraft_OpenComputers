@@ -7,10 +7,11 @@ local computer = rawget(_G, "computer")
 local gpuAddress = component.list("gpu")()
 if not gpuAddress then return end
 local gpu = component.proxy(gpuAddress)
+local width, height = gpu.getResolution()
 gpu.setBackground(0x000000)
 gpu.setForeground(0xFFFFFF)
-gpu.fill(1,1,gpu.getResolution()," ")
-gpu.set(2,2,"Hello YellowOS")
+gpu.fill(1, 1, width, height, " ")
+gpu.set(2, 2, "Hello YellowOS")
 computer.pullSignal(2)
 
 Device-aware code:
