@@ -1,3 +1,3 @@
 # YellowStore catalog
 # id|name|version|author|target|description|path
-terminalv2|TerminalV2|1.0.0|YellowYotu|both|Community application|store/apps/terminalv2/main.lua
+terminalv2|TerminalV2|1.0.0|YellowYotu|desktop|Community application|store/apps/terminalv2/main.lua
