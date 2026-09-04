@@ -18,5 +18,5 @@ local function loadFile(path)
     return program()
 end
 
-_G.YellowOS = {fs=fs,loadFile=loadFile,version="0.2.2",edition="Server Edition"}
+_G.YellowOS = {fs=fs,loadFile=loadFile,version="0.2.3",edition="Server Edition"}
 loadFile("/system/boot.lua")
