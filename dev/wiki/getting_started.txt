@@ -1,0 +1,21 @@
+YELLOWOS DEVELOPMENT - GETTING STARTED
+
+YellowOS applications are Lua source files executed inside YellowOS.
+For YellowStore v1 an application is one main.lua file.
+
+Recommended workflow:
+1. Create a folder on any writable disk.
+2. Write main.lua in YellowOS Dev Terminal with: edit /main.lua
+3. Test it with: lua /main.lua
+4. Use Submit App or terminal command: submit
+5. Select the disk and main.lua.
+6. Enter app ID, name, version, author and target.
+7. YellowOS Server receives the submission for review.
+8. After approval the server publishes it to GitHub and YellowStore.
+
+Targets:
+mobile  - YellowPad Lite / YellowPad / YellowPad Pro
+ desktop - YellowOS Desktop Edition
+all     - both platforms
+
+Keep applications small. YellowStore v1 is designed for single-file Lua apps.
