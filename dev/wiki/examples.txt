@@ -1,0 +1,31 @@
+EXAMPLES
+
+Portable hello app:
+
+local component = rawget(_G, "component")
+local computer = rawget(_G, "computer")
+local gpuAddress = component.list("gpu")()
+if not gpuAddress then return end
+local gpu = component.proxy(gpuAddress)
+gpu.setBackground(0x000000)
+gpu.setForeground(0xFFFFFF)
+gpu.fill(1,1,gpu.getResolution()," ")
+gpu.set(2,2,"Hello YellowOS")
+computer.pullSignal(2)
+
+Device-aware code:
+
+if YellowOS.device then
+  print("Running on " .. YellowOS.device)
+else
+  print("Desktop application")
+end
+
+HTTP:
+
+local data, reason = YellowOS.http.get("https://example.com")
+if not data then
+  print(reason)
+end
+
+For real UI applications prefer GPU drawing and touch/key_down signals instead of print().
