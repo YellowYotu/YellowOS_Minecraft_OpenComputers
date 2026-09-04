@@ -39,7 +39,7 @@ end
 _G.YellowOS = {
     fs = fs,
     loadFile = loadFile,
-    version = "0.2.5",
+    version = "0.2.6",
     edition = "User Edition",
     device = device,
     systemDiskProtected = true
