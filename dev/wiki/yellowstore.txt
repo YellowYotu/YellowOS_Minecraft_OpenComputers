@@ -1,0 +1,19 @@
+YELLOWSTORE PUBLISHING
+
+Publishing flow:
+Developer PC -> YellowOS Server -> owner review -> GitHub -> YellowStore clients.
+
+1. Test your application locally.
+2. Open Submit App or type submit in Dev Terminal.
+3. Choose the disk containing the Lua program.
+4. Enter the path to the program.
+5. Set application ID, name, version, author and target.
+6. The program is sent in chunks over the wireless network to YellowOS Server Edition.
+7. The server stores it in the pending review queue.
+8. The owner opens App Review.
+9. Approve publishes the code and updated catalog to GitHub.
+10. Reject keeps it out of YellowStore.
+
+The Server Edition GitHub token is stored locally under /system/secrets and is never included in YellowOS updates or the public repository.
+
+App IDs should be stable and unique. Publishing the same ID again replaces that app's catalog entry with the new version.
