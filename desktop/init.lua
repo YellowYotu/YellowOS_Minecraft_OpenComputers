@@ -35,7 +35,7 @@ _G.YellowOS = {
     bootAddress = bootAddress,
     loadFile = loadFile,
     readAll = readAll,
-    version = "0.2.3",
+    version = "0.2.4",
     edition = "Desktop Edition"
 }
 
