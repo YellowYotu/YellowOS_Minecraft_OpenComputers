@@ -13,6 +13,19 @@ local function ensureDir(path)
     if not fs.exists(path) then fs.makeDirectory(path) end
 end
 
+local function read(path)
+    local h = fs.open(path, "r")
+    if not h then return nil end
+    local d = ""
+    while true do
+        local c = fs.read(h, 4096)
+        if not c then break end
+        d = d .. c
+    end
+    fs.close(h)
+    return d
+end
+
 local function write(path, data)
     local h = fs.open(path, "w")
     if not h then return false end
@@ -24,6 +37,20 @@ end
 ensureDir("/store")
 ensureDir("/store/pending")
 ensureDir("/store/rejected")
+
+-- Official one-time review seed. The marker prevents the app from reappearing
+-- after it has been approved or rejected.
+local seedMarker = "/store/.terminalv2_seeded"
+if not fs.exists(seedMarker) then
+    local seedCode = read("/system/seeds/terminalv2.lua")
+    local seedMeta = read("/system/seeds/terminalv2.meta")
+    if seedCode and seedMeta then
+        seedMeta = seedMeta:gsub("bytes=%d+", "bytes=" .. tostring(#seedCode))
+        write("/store/pending/terminalv2-official.lua", seedCode)
+        write("/store/pending/terminalv2-official.meta", seedMeta)
+        write(seedMarker, "1\n")
+    end
+end
 
 function appserver.processSignal(signal, receiver, sender, port, distance, kind, ...)
     if signal ~= "modem_message" or port ~= appserver.port then return false end
