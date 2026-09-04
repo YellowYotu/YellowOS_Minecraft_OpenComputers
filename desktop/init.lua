@@ -7,7 +7,6 @@ end
 
 local bootAddress = computer.getBootAddress()
 if not bootAddress then error("Boot drive not found") end
-
 local fs = component.proxy(bootAddress)
 
 local function readAll(path)
@@ -36,7 +35,7 @@ _G.YellowOS = {
     bootAddress = bootAddress,
     loadFile = loadFile,
     readAll = readAll,
-    version = "0.2.0",
+    version = "0.2.1",
     edition = "Desktop Edition"
 }
 
