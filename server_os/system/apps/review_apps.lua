@@ -2,6 +2,7 @@ local common = YellowOS.common
 local fs = YellowOS.fs
 local http = YellowOS.http
 local github = YellowOS.github
+local computer = rawget(_G, "computer")
 local CATALOG_URL = "https://raw.githubusercontent.com/YellowYotu/YellowOS_Minecraft_OpenComputers/main/store/catalog.txt"
 
 local function read(path)
@@ -34,6 +35,33 @@ local function pendingList()
     return list
 end
 
+local function preview(app)
+    local code = read("/store/pending/"..app.sid..".lua") or ""
+    local lines = {}
+    for line in (code.."\n"):gmatch("(.-)\n") do table.insert(lines,line) end
+    local offset = 1
+    while true do
+        common.header("Source Review")
+        common.gpu.setForeground(0x808080)
+        common.gpu.set(3,4,(app.name or app.id).." | "..tostring(#code).." bytes | line "..offset)
+        common.gpu.setForeground(0xFFFFFF)
+        local y = 6
+        for i=offset,math.min(#lines,offset+common.height-9) do
+            common.gpu.set(2,y,(tostring(i).."  "..lines[i]):sub(1,common.width-2))
+            y=y+1
+        end
+        common.gpu.setForeground(0x808080)
+        common.gpu.set(3,common.height-1,"UP/DOWN scroll   BACKSPACE back")
+        local e={computer.pullSignal()}
+        if e[1]=="key_down" then
+            local codeKey=e[4] or 0
+            if codeKey==common.KEY_UP then offset=math.max(1,offset-1)
+            elseif codeKey==common.KEY_DOWN then offset=math.min(math.max(1,#lines),offset+1)
+            elseif codeKey==common.KEY_BACKSPACE then return end
+        elseif YellowOS.appserver then YellowOS.appserver.processSignal(table.unpack(e)) end
+    end
+end
+
 local function buildCatalog(old, app)
     local lines = {"# YellowStore catalog", "# id|name|version|author|target|description|path"}
     for line in tostring(old):gmatch("[^\r\n]+") do
@@ -50,53 +78,39 @@ end
 
 while true do
     local pending = pendingList()
-    if #pending == 0 then
-        common.message("App Review", "No pending application submissions.")
-        return
-    end
-
+    if #pending == 0 then common.message("App Review", "No pending application submissions."); return end
     local names = {}
-    for _,a in ipairs(pending) do table.insert(names, (a.name or a.id or a.sid).."  "..(a.version or "?")) end
-    table.insert(names, "Back")
-    local s = common.menu("App Review", tostring(#pending).." pending", names)
-    if not s or s == #names then return end
-    local app = pending[s]
-    local choice = common.menu(app.name or app.id, (app.author or "Unknown").." | "..(app.target or "all"), {"Approve + publish to GitHub", "Reject", "Back"})
+    for _,a in ipairs(pending) do table.insert(names,(a.name or a.id or a.sid).."  "..(a.version or "?")) end
+    table.insert(names,"Back")
+    local s=common.menu("App Review",tostring(#pending).." pending",names)
+    if not s or s==#names then return end
+    local app=pending[s]
+    local choice=common.menu(app.name or app.id,(app.author or "Unknown").." | "..(app.target or "all").." | "..tostring(app.bytes or "?").." B",{"View source","Approve + publish to GitHub","Reject","Back"})
 
-    if choice == 1 then
+    if choice==1 then
+        preview(app)
+    elseif choice==2 then
         if not github or not github.isConfigured() then
-            common.message("App Review", "GitHub token is not configured.\nOpen GitHub Setup first.")
+            common.message("App Review","GitHub token is not configured.\nOpen GitHub Setup first.")
         else
-            local code = read("/store/pending/"..app.sid..".lua")
-            if not code then
-                common.message("App Review", "Submission code is missing.")
-            else
-                common.header("Publishing App")
-                common.gpu.set(3, 6, "Publishing "..(app.name or app.id).." to GitHub...")
-                local catalog, reason = http.get(CATALOG_URL .. "?t=" .. tostring(math.floor((rawget(_G,"computer").uptime())*1000)))
-                if not catalog then
-                    common.message("Publish failed", tostring(reason))
-                else
-                    local newCatalog = buildCatalog(catalog, app)
-                    local ok, result = github.publishApp(app, code, newCatalog)
+            local code=read("/store/pending/"..app.sid..".lua")
+            if not code then common.message("App Review","Submission code is missing.") else
+                common.header("Publishing App"); common.gpu.set(3,6,"Publishing "..(app.name or app.id).." to GitHub...")
+                local catalog,reason=http.get(CATALOG_URL.."?t="..tostring(math.floor(computer.uptime()*1000)))
+                if not catalog then common.message("Publish failed",tostring(reason)) else
+                    local newCatalog=buildCatalog(catalog,app)
+                    local ok,result=github.publishApp(app,code,newCatalog)
                     if ok then
-                        fs.remove("/store/pending/"..app.sid..".meta")
-                        fs.remove("/store/pending/"..app.sid..".lua")
-                        common.message("Published", (app.name or app.id).." is now in YellowStore.\nCommit: "..tostring(result):sub(1,12))
-                    else
-                        common.message("Publish failed", tostring(result))
-                    end
+                        fs.remove("/store/pending/"..app.sid..".meta"); fs.remove("/store/pending/"..app.sid..".lua")
+                        common.message("Published",(app.name or app.id).." is now in YellowStore.\nCommit: "..tostring(result):sub(1,12))
+                    else common.message("Publish failed",tostring(result)) end
                 end
             end
         end
-    elseif choice == 2 then
-        local code = read("/store/pending/"..app.sid..".lua") or ""
-        local meta = read("/store/pending/"..app.sid..".meta") or ""
+    elseif choice==3 then
+        local code=read("/store/pending/"..app.sid..".lua") or ""; local meta=read("/store/pending/"..app.sid..".meta") or ""
         if not fs.exists("/store/rejected") then fs.makeDirectory("/store/rejected") end
-        local h = fs.open("/store/rejected/"..app.sid..".txt", "w")
-        if h then fs.write(h, meta.."\n---CODE---\n"..code); fs.close(h) end
-        fs.remove("/store/pending/"..app.sid..".meta")
-        fs.remove("/store/pending/"..app.sid..".lua")
-        common.message("App Review", "Submission rejected.")
+        local h=fs.open("/store/rejected/"..app.sid..".txt","w"); if h then fs.write(h,meta.."\n---CODE---\n"..code); fs.close(h) end
+        fs.remove("/store/pending/"..app.sid..".meta"); fs.remove("/store/pending/"..app.sid..".lua"); common.message("App Review","Submission rejected.")
     end
 end
